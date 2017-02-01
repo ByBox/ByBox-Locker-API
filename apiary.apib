@@ -1,0 +1,1550 @@
+FORMAT: 1A
+
+# ByBox Locker API
+
+This document describes the API used by the ByBox Locker Application to interact with the server.
+
+For information about authentication and authorisation, see the [ByBox Authentication API][BbAuthApi].
+
+[BbAuthApi]: https://app.apiary.io/byboxauthentication
+
+## To be defined:
+ * API Versioning
+
+# Group Notifications
+
+Set user notification preference and retrieve notifications
+
+## SetUserOption [/Notifications/SetUserOption]
+
+Set user notification preference
+
+### SetUserOption [POST]
+
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+
++ Response 200 (application/json; charset=utf-8)
+
+## NotificationSummary [/Notification/GetSummary]
+
+### Notification summary [GET]
+
+This endpoint returns a summary of notifications for the current user.
+
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+
++ Response 200 (application/json; charset=utf-8)
+
+    + Body
+
+            {
+              "totalPages": 1,
+              "totalNotifications" : 4,
+              "totalUnReadNotifications" : 2
+            }
+
+
+
+## Notifications [/Notification/Get/{page}]
+
+### List notifications [GET]
+
+This endpoint returns a list of notifications for the current user.
+
++ Parameters
+    + page (number, optional) - The page of data to return
+        +Default: `1`
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+
++ Response 200 (application/json; charset=utf-8)
+
+    + Body
+
+            {
+              "totalPages": 1,
+              "currentPage": 1,
+              "totalNotifications" : 4,
+              "totalUnReadNotifications" : 2,
+              "notifications": [
+                {
+                  "id": 100,
+                  "at": "2016-06-16T11:40:08.341512+01:00",
+                  "type": "GeneralDelivery",
+                  "data": {
+                    "itemCode" : "MWBARCODEXX2",
+                    "locationName" : "Hatfield",
+                    "doorName" : "1A"
+                  },
+                  "read" : false
+                },
+                {
+                  "id": 11,
+                  "at": "2016-06-15T12:40:08.341512+01:00",
+                  "type": "GeneralDelivery",
+                  "data": {
+                    "itemCode" : "MWBARCODEX6841",
+                    "locationName" : "Hatfield",
+                    "doorName" : "3B"
+                  },
+                  "read" : false
+                },
+                {
+                  "id": 12,
+                  "at": "2016-06-15T12:30:08.341512+01:00",
+                  "type": "GeneralDelivery",
+                  "data": {
+                    "itemCode" : "MWBARCODEX6841",
+                    "locationName" : "Hatfield",
+                    "doorName" : "4F"
+                  },
+                  "read" : true
+                },
+                {
+                  "id": 13,
+                  "at": "2016-06-14T12:30:08.341512+01:00",
+                  "type": "GeneralDelivery",
+                  "data": {
+                    "itemCode" : "MWBARCODEX123",
+                    "locationName" : "Hatfield",
+                    "doorName" : "Long Doorname"
+                  },
+                  "read" : true
+                }                 
+                
+              ]
+            }
+
+# Group Accounts
+
+Allows a new user to activate their account.
+
+## Activate [/Accounts/Activate]
+
+Only valid for an inactive account. If successful, the account will be activated, the user's
+password will be set, and they will be signed in.
+
+For the activation code we will use digits as these are very easy to enter on a phone when
+the text entry field is configured to show the numeric virtual keyboard. We will use 9 digits.
+We will present these in the email as three groups of three digits, e.g.:
+
+    Your account activation code is 385-623-576.
+
+We will be fairly relaxed about the format though. On the server side, we'll remove any
+non-digit characters and then match against the regular expression `^[0-9]{9}$`. This means
+that almost anything is acceptable from the client as a separator character.
+
+### Activate [POST]
+
++ Request
+The request must contain the Authorization header, just as it does if you're about to make a
+token request because, under the hood, that's exactly what will happen.
+
+    + Headers
+    
+            Authorization: Basic RXJza2luZVVzZXI6OTQzNWU2NWYtOWY4MC00Mzc5LWFmZjItNjNhMDZiZTJhMWNl
+    
+    + Body
+    
+            {
+                "userName": "london.calebout",
+                "activationCode": "abc-123-def",
+                "newPassword": "Correct-Horse-Battery-Staple-3"
+            }
+    
++ Response 200 (application/json; charset=utf-8)
+This is returned when the activationCode matches with the userName and the user is effectively
+signed in. The returned access_token can be used in subsequent API calls.
+
+    + Body
+    
+            {
+                "access_token": "6cfe313d8a959e75e921df3a22df5c2d",
+                "expires_in": 3600,
+                "token_type": "Bearer"
+            }
+
++ Response 403
+This is returned if the accessCode and userName do not match.
+
+    + Body
+
+
+## Restart Activation [/Accounts/RestartActivation]
+
+If the user can't remember their activation code, or if it has expired, or if they can't type it
+for some reason, this endpoint gives them a chance to get another code and start again.
+
+### Restart Activation [POST]
+
++ Request
+The userName field could be the user's username or some other uniquely identifying piece of
+information such as their email address.
+
+    + Headers
+    
+            Authorization: Basic RXJza2luZVVzZXI6OTQzNWU2NWYtOWY4MC00Mzc5LWFmZjItNjNhMDZiZTJhMWNl
+    
+    + Body
+    
+            {
+                "userName": "london.calebout"
+            }
+            
++ Response 204
+A activation code will be sent to the user at one of their registered message endpoints (probably
+email and/or SMS).
+
+    + Body
+
++ Response 404
+The user's account has already been activated or no such registration has ever been received.
+
+    + Body
+
+
+## Reset Password [/Accounts/ResetPassword]
+
+If the user can't remember their password, or if they can't type it for some reason, this endpoint
+gives them a chance to re-activate their account and specify a new password.
+
+### Reset Password [POST]
+
++ Request
+The userName field could be the user's username or some other uniquely identifying piece of
+information such as their email address.
+
+    + Headers
+    
+            Authorization: Basic RXJza2luZVVzZXI6OTQzNWU2NWYtOWY4MC00Mzc5LWFmZjItNjNhMDZiZTJhMWNl
+    
+    + Body
+    
+            {
+                "userName": "london.calebout"
+            }
+            
++ Response 204
+A activation code will be sent to the user at one of their registered message endpoints (probably
+email and/or SMS).
+
+    + Body
+
++ Response 404
+The user's account has already been activated or no such registration has ever been received.
+
+    + Body
+
+
+
+# Group Locations
+
+We shall use `Etag` and `If-None-Match` headers to allow the phone to cache the results and reduce
+unnecessary data transfers.
+
+## Locations [/Locations]
+
+### List Locations [GET]
+
+This endpoint returns a list of locations that the current user has access to.
+
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+            If-None-Match: etag-result-from-previous-call
+
++ Response 200 (application/json; charset=utf-8)
+
+    + Headers
+    
+            Etag: something-opaque
+
+    + Body
+
+            [
+                {
+                    "id": 1,
+                    "name": "South Mimms Service Station",
+                    "postcode": "EN6 3QQ",
+                    "lat": 51.687466,
+                    "lon": -0.221720,
+                    "openingHours": "8am - 5pm",
+                    "accessInformation": "The code for the gate is 1234",
+                    "totalPendingCollections": 3,
+                    "doors": [
+                        {
+                            "id": 1,
+                            "name": "Door L3",
+                            "mode": "General",
+                            "graphic": "mountain",
+                            "size": "Small",
+                            "empty": false,
+                            "locks": [
+                                {
+                                    "id": 1,
+                                    "code": "d8a3d77ba29b67be16b77dfa417ee5c8",
+                                    "lastKnownLogId": 2
+                                }
+                            ]
+                        },
+                        {
+                            "id": 39,
+                            "name": "Door F3",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Medium",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 39,
+                                    "code": "0d347ac042bd6c9767ce5b4b6fcf66a8",
+                                    "lastKnownLogId": 3
+                                }
+                            ]
+                        },
+                        {
+                            "id": 17,
+                            "name": "Door G5",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Large",
+                            "empty": false,
+                            "locks": [
+                                {
+                                    "id": 321,
+                                    "encryptedCode": "c61c9b3f1a327d303a5edf88dd03b68e",
+                                    "previousCode": "99a3d77ae29b67be16b77dfa417ee5c1",
+                                    "code": "f8a3d77ae29b67be16bd6c97641fced1",
+                                    "lastKnownLogId": 4
+                                }
+                            ]
+                        },
+                        {
+                            "id": 171,
+                            "name": "Door G8",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Small",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 171,
+                                    "code": "2d347ac042bd6c9767ce5b4b6fcf66a7",
+                                    "lastKnownLogId": 5
+                                }
+                            ]
+                        },
+                        {
+                            "id": 172,
+                            "name": "Door G88",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Medium",
+                            "empty": false,
+                            "locks": [
+                                {
+                                    "id": 172,
+                                    "code": "cd347ac042bd6c9767ce5b4b6fcf66bb",
+                                    "lastKnownLogId": 6
+                                }
+                            ],
+                            "pendingCollections": [
+                                {
+                                    "barcode": "1122334455"
+                                }
+                            ],
+                            "pendingReturns": [
+                                {
+                                    "barcode": "bb-foo-item-12345555593",
+                                    "notes": "This is a note about the return"
+                                }
+                            ]
+                        },
+                        {
+                            "id": 2,
+                            "name": "Door G89",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Large",
+                            "empty": false,
+                            "locks": [
+                                {
+                                    "id": 2,
+                                    "code": "69a3d77ae29b67be16b77dfa417ee5c1",
+                                    "lastKnownLogId": 7
+                                }
+                            ],
+                            "pendingCollections": [
+                                {
+                                    "barcode": "433498348",
+                                    "notes": "This section is for any notes"
+                                },
+                                {
+                                    "barcode": "1234000000002340",
+                                    "jobReference": "JOBXYY"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 2,
+                    "name": "Bracknell Service Station",
+                    "postcode": "RG12 2UP",
+                    "lat": 51.398416,
+                    "lon": -0.744197,
+                    "openingHours": "8am - 5pm",
+                    "accessInformation": "The code for the gate is 1234",
+                    "totalPendingCollections": 0,
+                    "doors": [
+                        {
+                            "id": 3,
+                            "name": "Door A1",
+                            "mode": "General",
+                            "graphic": "mountain",
+                            "size": "Small",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 3,
+                                    "code": "aa347ac042bd6c9767ce5b4b6fcf66ad",
+                                    "lastKnownLogId": 3
+                                }
+                            ]
+                        },
+                        {
+                            "id": 4,
+                            "name": "Door C2",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Medium",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 4,
+                                    "code": "90347ac042bd6c9767ce5b4b6fcf55ea",
+                                    "lastKnownLogId": 6
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 3,
+                    "name": "Waterloo",
+                    "lat": 51.503165,
+                    "lon": -0.112305,
+                    "openingHours": "8am - 5pm",
+                    "accessInformation": "The code for the first gate is 1234. The code for the second gate is 2345.",
+                    "totalPendingCollections": 0,
+                    "doors": [
+                        {
+                            "id": 5,
+                            "name": "A1",
+                            "mode": "General",
+                            "graphic": "mountain",
+                            "size": "Small",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 5,
+                                    "code": "2de47ac042bd6c9767ce5b4b6fcf6643",
+                                    "lastKnownLogId": 7
+                                }
+                            ]
+                        },
+                        {
+                            "id": 6,
+                            "name": "C2",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Medium",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 6,
+                                    "code": "cf347ac042bd6c9767ce5b4b6fcf6622",
+                                    "lastKnownLogId": 34
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 4,
+                    "name": "Clapham Junction",
+                    "lat": 51.464064,
+                    "lon": -0.169996,
+                    "openingHours": "8am - 5pm",
+                    "accessInformation": "The code for the gate is 1234",
+                    "totalPendingCollections": 0,
+                    "doors": [
+                        {
+                            "id": 7,
+                            "name": "A1",
+                            "mode": "General",
+                            "graphic": "mountain",
+                            "size": "Small",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 7,
+                                    "code": "3d347ac042bd6c9767ce5b4b6fcf66bc",
+                                    "lastKnownLogId": 5
+                                }
+                            ]
+                        },
+                        {
+                            "id": 8,
+                            "name": "C2",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Medium",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 8,
+                                    "code": "45347ac042bd6c9767ce5b4b6fcf663a",
+                                    "lastKnownLogId": 6
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 5,
+                    "name": "Newcastle",
+                    "lat": 54.978252,
+                    "lon": -1.617780,
+                    "openingHours": "8am - 5pm",
+                    "accessInformation": "The code for the gate is 1234",
+                    "totalPendingCollections": 0,
+                    "doors": [
+                        {
+                            "id": 9,
+                            "name": "A1",
+                            "mode": "General",
+                            "graphic": "mountain",
+                            "size": "Small",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 9,
+                                    "code": "6789",
+                                    "lastKnownLogId": 39
+                                }
+                            ]
+                        },
+                        {
+                            "id": 12,
+                            "name": "C2",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Medium",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 12,
+                                    "code": "7890",
+                                    "lastKnownLogId": 54
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": 6,
+                    "name": "Vauxhall",
+                    "lat": 51.488616,
+                    "lon": -0.120714,
+                    "openingHours": "8am - 5pm",
+                    "accessInformation": "The code for the gate is 1234",
+                    "totalPendingCollections": 0,
+                    "doors": [
+                        {
+                            "id": 25,
+                            "name": "A1",
+                            "mode": "General",
+                            "graphic": "mountain",
+                            "size": "Small",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 25,
+                                    "code": "d8a3d77ba29b67be16b77dfa417ee5c8",
+                                    "lastKnownLogId": 34
+                                }
+                            ]
+                        },
+                        {
+                            "id": 11,
+                            "name": "C2",
+                            "mode": "General",
+                            "graphic": "wave",
+                            "size": "Medium",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 11,
+                                    "code": "0d347ac042bd6c9767ce5b4b6fcf66a8",
+                                    "lastKnownLogId": 34
+                                },
+                                {
+                                    "id": 17,
+                                    "code": "d8a3d77ba29b67be16b77dfa417ee5c8",
+                                    "lastKnownLogId": 1
+                                }
+                            ]
+                        },
+                        {
+                            "id": 20,
+                            "name": "DEV",
+                            "mode": "General",
+                            "graphic": "mountain",
+                            "size": "Large",
+                            "empty": true,
+                            "locks": [
+                                {
+                                    "id": 20,
+                                    "code": "241612cf0825a68e91b523572da31979",
+                                    "lastKnownLogId": 32
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+
+
+## Location [/Locations/{id}]
+
+### Get Location [GET]
+
+This endpoint returns a location that the current user has access to by the locations id.
+
++ Parameters
+    + id (number) - The id of the location
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+
++ Response 200 (application/json; charset=utf-8)
+
+    + Body
+
+            {
+                "id": 1,
+                "name": "South Mimms Service Station",
+                "postcode": "EN6 3QQ",
+                "lat": 51.687466,
+                "lon": -0.221720,
+                "openingHours": "8am - 5pm",
+                "accessInformation": "The code for the gate is 1234",
+                "totalPendingCollections": 3,
+                "doors": [
+                    {
+                        "id": 1,
+                        "name": "Door L3",
+                        "mode": "General",
+                        "graphic": "mountain",
+                        "size": "Small",
+                        "empty": false,
+                        "locks": [
+                            {
+                                "id": 1,
+                                "code": "d8a3d77ba29b67be16b77dfa417ee5c8",
+                                "lastKnownLogId": 2
+                            }
+                        ],
+                        "contents": [
+                            {
+                                "trackingNumber": "5014721112282",
+                                "scannedInDate": "2016-06-20T15:50:08.746+01:00"
+                            },
+                            {
+                                "trackingNumber": "1234721112282",
+                                "scannedInDate": "2016-06-20T15:51:09.246+01:00"
+                            }
+                        ]
+                    },
+                    {
+                        "id": 39,
+                        "name": "Door F3",
+                        "mode": "General",
+                        "graphic": "wave",
+                        "size": "Medium",
+                        "empty": true,
+                        "locks": [
+                            {
+                                "id": 39,
+                                "code": "0d347ac042bd6c9767ce5b4b6fcf66a8",
+                                "lastKnownLogId": 3
+                            }
+                        ]
+                    },
+                    {
+                        "id": 17,
+                        "name": "Door G5",
+                        "mode": "General",
+                        "graphic": "wave",
+                        "size": "Large",
+                        "empty": true,
+                        "locks": [
+                            {
+                                "id": 321,
+                                "encryptedCode": "c61c9b3f1a327d303a5edf88dd03b68e",
+                                "previousCode": "99a3d77ae29b67be16b77dfa417ee5c1",
+                                "code": "f8a3d77ae29b67be16bd6c97641fced1",
+                                "lastKnownLogId": 4
+                            }
+                        ]
+                    },
+                    {
+                        "id": 171,
+                        "name": "Door G8",
+                        "mode": "General",
+                        "graphic": "wave",
+                        "size": "Small",
+                        "empty": false,
+                        "locks": [
+                            {
+                                "id": 171,
+                                "code": "2d347ac042bd6c9767ce5b4b6fcf66a7",
+                                "lastKnownLogId": 5
+                            }
+                        ]
+                    },
+                    {
+                        "id": 172,
+                        "name": "Door G88",
+                        "mode": "General",
+                        "graphic": "wave",
+                        "size": "Medium",
+                        "empty": false,
+                        "locks": [
+                            {
+                                "id": 172,
+                                "code": "cd347ac042bd6c9767ce5b4b6fcf66bb",
+                                "lastKnownLogId": 6
+                            }
+                        ],
+                        "pendingCollections": [
+                            {
+                                "barcode": "1122334455"
+                            }
+                        ],
+                        "pendingReturns": [
+                            {
+                                "barcode": "bb-foo-item-12345555593",
+                                "notes": "This is a note about the return"
+                            }
+                        ]
+                    },
+                    {
+                        "id": 2,
+                        "name": "Door G89",
+                        "mode": "General",
+                        "graphic": "wave",
+                        "size": "Large",
+                        "empty": false,
+                        "locks": [
+                            {
+                                "id": 2,
+                                "code": "69a3d77ae29b67be16b77dfa417ee5c1",
+                                "lastKnownLogId": 7
+                            }
+                        ],
+                        "pendingCollections": [
+                            {
+                                "barcode": "433498348",
+                                "notes": "This section is for any notes"
+                            },
+                            {
+                                "barcode": "1234000000002340",
+                                "job": "JOBXYY"
+                            }
+                        ]
+                    }
+                ]
+            }
+
+
+
+# Group Activity
+
+## Activity [/Activity/{page}]
+
+### List Activity [GET]
+
+This endpoint returns a list of activity for the current user.
+
++ Parameters
+    + page (number, optional) - The page of activity data to return
+        +Default: `1`
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+
++ Response 200 (application/json; charset=utf-8)
+
+    + Body
+
+            {
+                "totalPages": 1,
+                "currentPage": 1,
+                "activity": 
+                [
+                    {
+                        "id": "1051-201604181409080694086",
+                        "location": {
+                            "id": 5,
+                            "name": "New Brunswick"
+                        },
+                        "door": {
+                            "id": 1051,
+                            "name": "Door 891"
+                        },
+                        "scannedIn": [
+                            "363009",
+                            "612284"
+                        ],
+                        "scannedOut": [
+                            "782853"
+                        ],
+                        "at": "2016-04-18T14:09:08.0694086+00:00"
+                    },
+                    {
+                        "id": "1051-201604150909080694086",
+                        "location": {
+                            "id": 5,
+                            "name": "New Brunswick"
+                        },
+                        "door": {
+                            "id": 1051,
+                            "name": "Door 891"
+                        },
+                        "scannedIn": [
+                            "363003",
+                            "612084"
+                        ],
+                        "scannedOut": [
+                            "784353"
+                        ],
+                        "at": "2016-04-15T09:09:08.0694086+00:00"
+                    },
+                    {
+                        "id": "1051-201604140909080694086",
+                        "location": {
+                            "id": 5,
+                            "name": "New Brunswick"
+                        },
+                        "door": {
+                            "id": 1051,
+                            "name": "Door 891"
+                        },
+                        "scannedIn": [
+                            "635673",
+                            "759074"
+                        ],
+                        "scannedOut": [
+                            "584084"
+                        ],
+                        "at": "2016-04-14T09:09:08.0694086+00:00"
+                    },
+                    {
+                        "id": "1051-201604140908080694086",
+                        "location": {
+                            "id": 5,
+                            "name": "New Brunswick"
+                        },
+                        "door": {
+                            "id": 1051,
+                            "name": "Door 891"
+                        },
+                        "scannedIn": [
+                            "298681",
+                            "581501",
+                            "492596"
+                        ],
+                        "scannedOut": [
+                            "557613",
+                            "873799"
+                        ],
+                        "at": "2016-04-14T09:08:08.0694086+00:00"
+                    }
+                ]
+            }
+
+# Group Jobs
+
+## Assign [/Jobs/assign/{reference}]
+
+### Assign Job Reference [POST]
+
+This endpoint assigns a job by reference to the current user.
+
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+
++ Response 200 (application/json; charset=utf-8)
+This is returned when the job assignment was accepted for processing
+
+    + Body
+    
++ Response 400 (application/json; charset=utf-8)
+This is returned when the job assignment request is invalid, e.g for an invalid job reference or user/engineer
+
+    + Body
+
++ Response 409 (application/json; charset=utf-8)
+This is returned when the job is in progress and already assigned to an engineer
+
+    + Body
+
+## Search Jobs [/Jobs/Search?searchTerm={searchTerm}&page={page}]
+
+### List Jobs [GET]
+
+This endpoint returns a list of jobs matching the search term for the specified page.
+
++ Parameters
+    + searchTerm (string) - The term to search for
+    + page (number) - The page of search results to return
+
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+
++ Response 200 (application/json; charset=utf-8)
+
+    + Body
+
+            {
+                "currentPage": 1,
+                "results": [
+                    {
+                        "assignedToMe": true,
+                        "at": "2016-06-28T18:41:39.1073187+00:00",
+                        "reference": "REFJOB",
+                        "totalPackages": 3,
+                        "totalPackagesCollected": 1,
+                        "totalPackagesToCollect": 2
+                    }
+                ],
+                "totalNumberOfPages": 1,
+                "totalResults": 1
+            }
+
+## Job [/Jobs/{reference}]
+
+### Get Job [GET]
+
+This endpoint returns a job for the specified job reference.
+
++ Parameters
+    + reference (string) - The job reference
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+
++ Response 400 (application/json; charset=utf-8)
+This is returned when the job is not found
+
+    + Body
+
++ Response 200 (application/json; charset=utf-8)
+
+    + Body
+
+            {
+                "reference": "JOBXYY",
+                "by": {
+                    "id": 1,
+                    "name": "Mark Bromwell"
+                },
+                "locations": [
+                    {
+                        "id": 1,
+                        "name": "Vauxhall",
+                        "doors": [
+                            {
+                                "id": 2,
+                                "name": "A1",
+                                "packages": [
+                                    {"barcode": "363009", "notes": "A package", "collected": true},
+                                    {"barcode": "612284", "notes": "A package", "collected": false}
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "at": "2016-04-18T14:09:08.0694086+00:00",
+                "assignedAt": "2016-04-18T14:09:08.0694086+00:00"
+            }
+
+## My Jobs [/MyJobs/{page}]
+
+### List Jobs [GET]
+
+This endpoint returns a list of jobs for the current user.
+
++ Parameters
+    + page (number, optional) - The page of job data to return
+        +Default: `1`
++ Request
+
+    + Headers
+
+            Accept: application/json
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+            If-None-Match: etag-result-from-previous-call
+
++ Response 304 (application/json; charset=utf-8)
+This is returned when the supplied `If-None-Match` header matches the etag generated on the server.
+
+    + Body
+
++ Response 200 (application/json; charset=utf-8)
+
+    + Headers
+    
+            Etag: a-new-etag-for-the-latest-request
+
+    + Body
+
+            {
+                "totalPages": 1,
+                "currentPage": 1,
+                "totalJobs": 2,
+                "jobs": 
+                [
+                    {
+                        "reference": "JOBXYY",
+                        "by": {
+                            "id": 1,
+                            "name": "Mark Bromwell"
+                        },
+                        "locations": [
+                            {
+                                "id": 1,
+                                "name": "Vauxhall",
+                                "doors": [
+                                    {
+                                        "id": 2,
+                                        "name": "A1",
+                                        "packages": [
+                                            {"barcode": "363009", "notes": "A package", "collected": true},
+                                            {"barcode": "612284", "notes": "A package", "collected": false}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ],
+                        "at": "2016-04-18T14:09:08.0694086+00:00",
+                        "assignedAt": "2016-04-18T14:09:08.0694086+00:00"
+                    },
+                    {
+                        "id": "Jobs/1-JOBXYZ",
+                        "reference": "JOBXYZ",
+                        "by": {
+                            "id": 1,
+                            "name": "Mark Bromwell"
+                        },
+                        "locations": [
+                            {
+                                "id": 1,
+                                "name": "Vauxhall",
+                                "doors": [
+                                    {
+                                        "id": 2,
+                                        "name": "A1",
+                                        "packages": [
+                                            {"barcode": "963009", "notes": "A package", "collected": true},
+                                            {"barcode": "412284", "notes": "A package", "collected": false}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ],
+                        "at": "2016-04-18T14:09:08.0694086+00:00",
+                        "assignedAt": "2016-04-18T14:09:08.0694086+00:00"
+                    }
+                ]
+            }
+
+# Group Events
+
+## Events [/Events]
+
+Send all of the events that we have received from the boxes. The application should cache these
+events until such time as there is suficient signal (WiFi or cellular) to send the data. If the
+number of outstanding events is large (> 50 events) wait for a WiFi signal and send the events
+in batches. The events will typically be door unlocked events that have been received directly
+from the locker, and status values (battery level, door unlock count, etc.) that has been
+received in a message, or read from the locker's Bluetooth profile when the door was unlocked.
+
+NOTE: If we use a Bluetooth profile for battery status and door unlock count, we shold read
+the values every time we detect a box that we know about, and every time the we unlock a box's
+door.
+
+The events will be processed by the server asynchronously. If the status code is any 2xx code,
+then the phone can safely assume that the events it sent have been received by the server and
+can therefore be removed from the phone's local store. For any other status code, the phone
+should try to send the events again at a later time.
+
+If the `eventData` field is null for a given event, then it may be omitted entirely.
+
+### Send events to the server [POST]
+
++ Request (application/json)
+
+    + Headers
+    
+            Authorization: Bearer ae2589363fb93e463d1bb739e0231524
+
+    + Body
+
+            [
+                {
+                    "lockId": 5,
+                    "timestamp": "2015-07-13T13:58:47+01:00",
+                    "sequence": 1,
+                    "type": "DoorUnlocked",
+                    "eventData": null
+                },
+                {
+                    "lockId": 5,
+                    "timestamp": "2015-07-13T13:59:42+01:00",
+                    "sequence": 2,
+                    "type": "DoorLocked",
+                    "eventData": null
+                },
+                {
+                    "lockId": 7,
+                    "timestamp": "2015-09-11T17:07:47+01:00",
+                    "sequence": 3,
+                    "type": "BoxLocated",
+                    "eventData": {
+                        "latitude": 52.419161,
+                        "longitude": -1.490819
+                    }
+                },
+                {
+                    "lockId": 8,
+                    "timestamp": "2015-09-11T17:06:06+01:00",
+                    "sequence": 4,
+                    "type": "StatusUpdate",
+                    "eventData": {
+                        "batteryLevels": [
+                            47.0,
+                            null
+                        ],
+                        "batteryHealth": [
+                            98.3,
+                            null
+                        ],
+                        "firmwareVersion": "6.2"
+                    }
+                },
+                {
+                    "lockId": 8,
+                    "timestamp": "2015-09-11T17:07:06+01:00",
+                    "sequence": 5,
+                    "type": "ScannedIn",
+                    "eventData": {
+                        "barcodes": [
+                            "1234000000002340",
+                            "fjdjb9976XXcvBBmsdd900-98"
+                        ]
+                    }
+                },
+                {
+                    "lockId": 34,
+                    "timestamp": "2015-09-11T17:07:36+01:00",
+                    "sequence": 6,
+                    "type": "AccessCodeChanged",
+                    "eventData": {
+                        "previousCode": "241612CF0825A68E91B523572DA31979",
+                        "alreadyChanged": false
+                    }
+                },
+                {
+                    "lockId": 8,
+                    "timestamp": "2015-09-11T17:08:06+01:00",
+                    "sequence": 7,
+                    "type": "ScannedOut",
+                    "eventData": {
+                        "barcodes": [
+                            "bb-foo-item-12345555593"
+                        ]
+                    }
+                },
+                {
+                    "lockId": 7,
+                    "timestamp": "2016-01-07T12:20:47+00:00",
+                    "sequence": 8,
+                    "type": "SignedIn",
+                    "eventData": null
+                },
+                {
+                    "lockId": 7,
+                    "timestamp": "2016-01-07T12:20:48+00:00",
+                    "sequence": 9,
+                    "type": "DoorStuck",
+                    "eventData": null
+                },
+                {
+                    "lockId": 7,
+                    "timestamp": "2016-01-11T11:11:47+00:00",
+                    "sequence": 10,
+                    "type": "LogsRetrieved",
+                    "eventData": {
+                        "entries": [
+                            '066cd42f2f29428aceb7d868ce622458879c',
+                            '0aa9477f6ef9a5b34f5c6fc8c66a1e285f38',
+                            '9eca5a5f52c978d8eff847f6fb9b3da9c4f1',
+                            'b886fdda897ad8e51a06ef6e49a502ebb8bb'
+                        ]
+                    }
+                },
+                {
+                    "lockId": 34,
+                    "timestamp": "2016-01-19T11:47:47+00:00",
+                    "sequence": 11,
+                    "type": "LockAuthenticationFailure",
+                    "eventData": {
+                        "online": true,
+                        "synchronised": false
+                    }
+                },
+                {
+                    "lockId": 172,
+                    "timestamp": "2016-01-19T11:47:48+00:00",
+                    "sequence": 12,
+                    "type": "NotScannedOut",
+                    "eventData": {
+                        "barcodes": [
+                            "1122334455"
+                        ],
+                        "reason": "UnableToIdentify"
+                    }
+                }
+            ]
+
++ Response 204
+
++ Response 401 (text/plain)
+
+        Simulate this Unauthorized response by sending header "Prefer:status=401"
+
+
+
+# Group Data Structures
+
+## Location (object)
+
++ id: `1` (number)
+
+    The location ID.
+
++ name: `South Mimms Service Station` (string)
+
+    The name of the location.
+
++ openingHours: `8am - 5pm` (string)
+
+    The times of the day that the site is accessible. Might be an empty string.
+
++ accessInformation: `The code for the gate is 1234` (string)
+
+    Location access information. Might include information about how to gain entry to the location
+    or some diretions to the location. Might be an empty string.
+
++ latitude: `52.419161` (number)
+
+    The latitude of the location.
+
++ longitude: `-1.4907819` (number)
+
+    The longitude of the location.
+
++ doors: `[]` (array[Door])
+
+    Optional array (the field may be ommitted completely). Contains the `Door` objects that the
+    user has access to at this `Location`.
+
+
+## Door (object)
+
++ id: `1` (number)
+
+    The door ID.
+
++ name: `D4` (string)
+
+    The name of the door. This will be displayed on the phone and may be on a decal on the door as well.
+
++ mode: `General` (enum[string])
+    + Members
+        + `General`
+        + `Standard`
+
++ graphic: `mountain` (string)
+
+    An image that will be displayed on the phone, and also on the box to help the user quickly
+    identify and distinguish the particular door that he is working with.
+    
++ size: `Large` (enum[string])
+    + Members
+        + `Small`
+        + `Medium`
+        + `Large`
+
++ empty: `true` (boolean)
+    
++ locks: `[]` (array[Lock])
+
+
+## Lock (object)
+
+Note that the `encryptedCode` and `previousCode` fields may only be present (or non-null) when the code
+is in the process of changing.
+
++ id: `1` (number)
+
+    The lock ID.
+
++ code: `a64b84a41503f162b199eb9c8b555f78` (string)
+
+    A value that the phone will use to unlock the door. How this value is used is not defined here. This
+    value will be 16 bytes long.
+
++ encryptedCode: `abff58468feed4d4457dbcdabd241569` (string)
+
+    A value that represents an encrypted form of the access code. The encryption is not known to the
+    phone and so this value is opaque. It is used so that we can send the new code to the locker without
+    it being in the clear over the air. This value will be 16 bytes long.
+
++ previousCode: `a64b84a41503f162b199eb9c8b555f78` (string)
+
+    A value that indicates that the lock's access code is in a transitionary state. If `code` deos not
+    work, but `previousCode` does, then the phone should send a Change Access Code command to the lock
+    in order to set the code to the value of `code`. If the lock's code is not in a transitionary state,
+    this value will be `null`. This value will be 16 bytes long.
+
++ lastKnownLogId: `47` (number)
+
+    A 32-bit unsigned integer used to represent a log counter for logs on the lock. This value is the
+    last value that the server saw from the lock.`
+
+## Activity (object)
+
++ id `1051-201602180908080694086` (string)
+
+    The id related to the activity. Made up using the id of the item on which the activity took place and the UTC datetime of the activity.
+
++ location  (Location)
+
++ door (Door)
+
++ scannedIn (array[string])
+
++ scannedOut (array(string])
+
++ at: `2016-04-14T13:58:47.1234567+01:00` (string)
+
+## Package (object)
+
++ barcode `213212321` (string)
+
+    The barcode
+
++ notes `Some notes about the package` (string)
++ collected `Has the package been collected` (boolean)
+
+## Job (object)
+
++ id `Jobs/1-JOBXYZ` (string)
+
+    The id related to the job. Made up using the reference of the job and the group id to which it belongs.
+
++ reference `JOBXYZ` (string)
+
+    The reference of the job, you can use this to uniquely identify the job within the context of a client.
+
++ locations (array[object])
+
+    + id `1` (number)
+    + name `Vauxhall` (string)
+    + doors (array[object])
+
+        + id `1` (number)
+        + name `A1` (string)
+        + packages (array[Package])
+
++ by (object)
+
+    + id `1` (number)
+    + name `Mark Bromwell` (string)
+
++ assignedAt: `2016-04-14T13:58:47.1234567+01:00` (string)
++ at: `2016-04-14T13:58:47.1234567+01:00` (string)
+
+## Event (object)
+
++ lockId: `1` (number)
+
+    The globally unique lock ID.
+
++ timestamp: `2015-07-13T13:58:47.1234567+01:00` (string)
+
+    The time, according to the phone, at which the event was received from the locker. The time
+    should be in local time including the current timezone offset from UTC. If it is not possible
+    to retieve the current timezone offset from the phone's OS, then no timezone should be specified
+    (e.g. `...T13:58:47`). In the latter case, the server will assume a local timezone based on the
+    box's last known position. The phone should not convert the time to UTC. The fractional part
+    of the seconds should be included if the phone is able to provide it.
+
++ sequence: `1` (number)
+
+    An integer which indicates the order of events as they were generated on the phone. Useful when
+    the phone's timestamp isn't entirely reliable. The number is not necessarily unique as it may
+    reset when the app is reinstalled.
+
++ type: `DoorUnlocked` (enum[string])
+    + Members
+        + `DoorUnlocked`
+        + `DoorLocked`
+        + `BoxLocated`
+        + `StatusUpdate`
+        + `ScannedIn`
+        + `ScannedOut`
+        + `AccessCodeChangeInitiated` -- This one's generated on the server.
+        + `AccessCodeChanged`
+        + `SignedIn`
+        + `DoorStuck`
+        + `LogsRetrieved`
+        + `LockAuthenticationFailure`
+
++ eventData: `null` (enum, optional)
+    + (BoxLocatedInfo)
+    + (StatusUpdateInfo)
+    + (ScannedInOutInfo)
+    + (AccessCodeChangedInfo)
+    + (LogsRetrievedInfo)
+    + (LockAuthenticationFailureInfo)
+
+
+## BoxLocatedInfo (object)
+
+This event should be generated by the phone and stored in it's log for upload to the server, whenever
+it receives a `DoorUnlocked` message from a box. The phone may ommit the message if there is difficulty
+retrieving a GPS signal.
+
++ latitude: `52.419161` (number)
+
+    The latitude of the phone when it received the event. If it is not possible to retrieve the value,
+    then it should be null.
+
++ longitude: `-1.4907819` (number)
+
+    The longitude of the phone when it received the event. If it is not possible to retrieve the value,
+    then it should be null.
+
+
+## StatusUpdateInfo (object)
+
++ batteryLevels: `[47.2,100.0]` (array[number])
+
+    An array where each element is a number representing the percentage level of the corresponding
+    battery pack. Item 0 represents battery 1, item 1 represents battery 2, etc. A null value indicates
+    that the battery is missing, or is not reporting it's level for some reason. There must be exactly
+    one item in the array for every battery pack that the door is expected to contain.
+
++ batteryHealth: `[98.3,99.7]` (array[number])
+
+    An array where each element is a number representing the percentage health of the corresponding
+    battery pack. Item 0 represents battery 1, item 1 represents battery 2, etc. A null value indicates
+    that the battery is missing, or is not reporting it's health for some reason. There must be exactly
+    one item in the array for every battery pack that the door is expected to contain.
+
++ firmwareVersion: `6.6.6` (string)
+
+    A string which represents the version of the firmware. The format of the string is unspecified.
+
+
+## ScannedInOutInfo (object)
+
++ barcdes: `['1234567890', 'carrier1-barcode-foo', 'carrier2-barcode-baz']` (array[string])
+
+    An array of arbitrary-length strings. These strings are the scanned barcodes on the packages. They
+    are from various carriers and could be in any format.
+
+
+## AccessCodeChangedInfo (object)
+
++ previousCode: `a64b84a41503f162b199eb9c8b555f78` (string)
+
+    The old value of the lock's `code`. This allows the server to tie up the code changed event with the most
+    recently pending code change.
+
++ alreadyChanged: `true` (boolean)
+
+    Indicates whether the code had already been changed when this user attempted to open the lock. A `true`
+    value indicates that somebody else changed it, a `false` value indicates that the current user changed
+    it.
+
+
+## LogsRetrievedInfo (object)
+
++ entries: `['066cd42f2f29428aceb7d868ce622458879c', '0aa9477f6ef9a5b34f5c6fc8c66a1e285f38']` (array[string])
+
+    An array of hexadecimal strings. Each string represents a log entry buffer, exactly as it was
+    received from the lock. The phone does not need to make any attempt to interpret the data. This
+    specification will not specify the size of each entry, but at the time of writing, each entry
+    is expected to be 18 bytes long.
+
+
+## LockAuthenticationFailureInfo (object)
+
++ online: `true` (boolean)
+
+    Indicates that the phone was online (or not) at the time of the authentication failure.
+
++ synchronised: `true` (boolean)
+
+    Indicates that the phone had successfully synchronised it's data with the server (or not) at the time
+    of the authentication failure.
